@@ -145,6 +145,7 @@ struct input_requests *request_in(int *offsets, size_t size_offsets, const char*
 		goto clean;
 	}
 	
+	// lgpiod bias works with the internal pull-up or pull-down resistors of RASPI5. However this is insufficient to work with DHT11 and they recomment an external 5K pullup.
 	/*
 	int setBias = gpiod_line_settings_set_bias(line_settings, GPIOD_LINE_BIAS_PULL_UP);
 	if(setBias <0)

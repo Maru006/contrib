@@ -4,7 +4,7 @@
 #include <time.h>
 #include <stdlib.h>
 
-#include "../utils/utils.h"
+#include "utils.h"
 
 #define CHIP0 "/dev/gpiochip0"
 #define BUFFER 100

@@ -3,7 +3,7 @@
 #include <gpiod.h>
 #include <time.h>
 #include <unistd.h>
-#include "../utils/utils.h"
+#include "utils.h"
 
 #define CHIP "/dev/gpiochip0"
 

@@ -6,7 +6,7 @@
 #include "utils.h"
 
 #define CHIP "/dev/gpiochip0"
-
+#define DETECT 20
 
 int main(void)
 {
@@ -36,7 +36,7 @@ int main(void)
 	int user = 0;
 	pause.tv_sec = 0;
 	pause.tv_nsec = 100000000;
-	while(user < 100)
+	while(user < DETECT)
 	{
 		printf("\nDetecting");
 		enum gpiod_line_value call = gpiod_line_request_get_value(

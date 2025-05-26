@@ -20,3 +20,5 @@ Bearing in mind the version of libpgiod this is using and assuming you have clon
 Simply compile as (assuming gcc compiler):
 
 gcc main.c utils.c -l gpiod
+
+-26/05/2025

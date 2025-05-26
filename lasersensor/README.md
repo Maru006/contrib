@@ -21,3 +21,9 @@ Additionally, I have encountered my WAVESHARE LASER SENSOR would overheat and pr
 Some WAVESHARE LASER SENSOR appear to operate only by using more than 3.3v. Users are reminded, when operating with 5v GPIO this software will not terminate power from this line.
 
 -18/05/2025
+
+Bearing in mind the version of libpgiod this is using and assuming you have cloned this repository as is with all the libraries in the same directory:
+
+Simply compile as (assuming gcc compiler):
+
+gcc main.c utils.c -l gpiod

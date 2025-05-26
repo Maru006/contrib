@@ -12,3 +12,11 @@ There is NO WARRANTY, to the extent permitted by law.
 This "software" is intended as an example on how to use libgpiod v2.3-devel.
 
 -13/05/2025
+
+Instructions:
+
+**Bearing in mind the version of libpgiod this is using and assuming you have cloned this repository as is with all the libraries in the same directory:
+
+Simply compile as (assuming gcc compiler):
+
+gcc main.c utils.c -l gpiod**

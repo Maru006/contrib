@@ -35,6 +35,8 @@ int main (void)
 	int channel1 = 0x06;
 	int channel2 = 0x0A;
 
+	// Need to press ENTTER key after instruction key below. 
+	// However as it is a getchar() func, typing multiple instructions key, the servo will compare each character and move corresponding to the series of characters that follow
 	int up = 'w';
 	int down = 's';
 	int left = 'a';

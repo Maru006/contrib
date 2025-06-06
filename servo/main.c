@@ -8,7 +8,7 @@
 #include "utils.h"
 
 #define I2C_DEV_PATH "/dev/i2c-1"
-#define SENSITIVITY 100
+#define SENSITIVITY 200
 #define PWM 30
 
 #define MAXLEFT 400
@@ -48,12 +48,23 @@ int main (void)
 	int channel2base = 1400;
 	setangle(fd, channel1, channel1base, PWM);
 	setangle(fd, channel2, channel2base, PWM);
+	
 	int c;
-
-	while(((c = getchar()) != 27))
+	while((c = getchar()) != 27)
 	{
-		if (c == reset)
+
+		if ((channel1base <= MAXLEFT)  // Exceeded left limit
+				|| (channel1base >= MAXRIGHT) // Exceeded right limit
+				|| (channel2base <= MAXDOWN)  // Exceeded down limit
+				|| (channel2base >= MAXUP))   // Exceeded up limit
 		{
+			printf("\nExceeded Stats");
+		}
+
+		if (c == reset) 
+		{
+			channel1base = 1500;
+			channel2base = 1400;
 			setangle(fd, channel1, channel1base, PWM);
 			setangle(fd, channel2, channel2base, PWM);
 		}
@@ -80,13 +91,6 @@ int main (void)
 		else if (c == commit)
 			printf("\nCommit");
 
-		else if ((channel1base > MAXLEFT)  // Exceeded left limit
-				|| (channel1base < MAXRIGHT) // Exceeded right limit
-				|| (channel2base > MAXDOWN)  // Exceeded down limit
-				|| (channel2base < MAXUP))   // Exceeded up limit
-		{
-			printf("\nExceeded Stats");
-		}
 		else
 		{
 			printf("\nUnknown Key. Use WASD");

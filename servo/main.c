@@ -9,7 +9,7 @@
 
 #define I2C_DEV_PATH "/dev/i2c-1"
 #define SENSITIVITY 200
-#define PWM 30
+#define PWM 35
 
 #define MAXLEFT 400
 #define MAXDOWN 400
@@ -44,8 +44,8 @@ int main (void)
 	int commit = '\n';
 	int reset = 'r';
 
-	int channel1base = 1500;
-	int channel2base = 1400;
+	int channel1base = 1300;
+	int channel2base = 1200;
 	setangle(fd, channel1, channel1base, PWM);
 	setangle(fd, channel2, channel2base, PWM);
 	
@@ -63,8 +63,8 @@ int main (void)
 
 		if (c == reset) 
 		{
-			channel1base = 1500;
-			channel2base = 1400;
+			channel1base = 1300;
+			channel2base = 1200;
 			setangle(fd, channel1, channel1base, PWM);
 			setangle(fd, channel2, channel2base, PWM);
 		}

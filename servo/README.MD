@@ -1,3 +1,8 @@
+*UNDER CONSTRUCTION*
+Most users won’t limit themselves to a single pair of servos, yet the PCA9685 bundled with the Pan Tilt Camera from The Pi Hut defaults to the I²C address 0x40. If you connect multiple Pan Tilt Cameras, they’ll all share the same I²C bus — creating address conflicts and limiting control. While the PCA9685 comes in various configurations (some supporting more than two servos), the Pan Tilt Camera module is restricted to just two. To scale beyond this limitation, the most practical solution is to use an I²C multiplexer, like the SparkFun Qwiic Mux Breakout (TCA9548A).
+-15/07/2025
+
+
 Working C code for the Upgraded Pan Tilt Platform for Official Raspberry Pi Camera Module** 
 
 This a free "software": you are free to change and redistribute it. There is NO WARRANTY, to the extent permitted by law.

@@ -1,122 +1,102 @@
-#include <stdio.h> 
-#include <time.h>
-#include <stdint.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <sys/ioctl.h>
 #include <linux/i2c-dev.h>
+#include <sys/ioctl.h>
+#include <stdint.h>
 #include "utils.h"
 
-#define I2C_DEV_PATH "/dev/i2c-1"
-#define SENSITIVITY 200
-#define PWM 35
-
-#define MAXLEFT 400
-#define MAXDOWN 400
-#define MAXRIGHT 2200
-#define MAXUP 2100
-
-int main (void)
+void flush()
 {
-	int fd = open(I2C_DEV_PATH, O_RDWR);
-	if (fd < 0)
-	{
-		perror("\nIssue at request: ");
-		goto clean;
-	}
-
-	int slave = ioctl(fd, I2C_SLAVE, ADDR1);
-	if (slave < 0)
-	{
-		perror("\n Issue with at slave");
-		return -1;
-	}
-
-	int channel1 = 0x06;
-	int channel2 = 0x0A;
-
-	// Need to press ENTTER key after instruction key below. 
-	// However as it is a getchar() func, typing multiple instructions key, the servo will compare each character and move corresponding to the series of characters that follow
-	int up = 'w';
-	int down = 's';
-	int left = 'a';
-	int right = 'd';
-	int commit = '\n';
-	int reset = 'r';
-
-	int channel1base = 1300;
-	int channel2base = 1200;
-	setangle(fd, channel1, channel1base, PWM);
-	setangle(fd, channel2, channel2base, PWM);
-	
 	int c;
-	while((c = getchar()) != 27)
+	while((c = getchar()) != EOF && c != '\n');
+}
+
+int main(void)
+{
+	int runtime = 0;
+	int fd = open(I2C_DEV_PATH, O_RDWR); 
+
+tca_channel:
+	int tca_channel, mask;
+	printf("\nEnter TCA Channel: ");
+	while ((tca_channel = getchar())!= EOF)
 	{
-
-		if ((channel1base <= MAXLEFT)  // Exceeded left limit
-				|| (channel1base >= MAXRIGHT) // Exceeded right limit
-				|| (channel2base <= MAXDOWN)  // Exceeded down limit
-				|| (channel2base >= MAXUP))   // Exceeded up limit
+		if (tca_channel == '\n')
 		{
-			printf("\nExceeded Stats");
+			continue;
 		}
-
-		if (c == reset) 
+		if (tca_channel == TERMINATE)
 		{
-			channel1base = 1300;
-			channel2base = 1200;
-			setangle(fd, channel1, channel1base, PWM);
-			setangle(fd, channel2, channel2base, PWM);
+			goto clean;
 		}
-		if (c == up)
+		else if (tca_channel < '0' || tca_channel > '7')
 		{
-			channel1base+=SENSITIVITY;
-			setangle(fd, channel1, channel1base, PWM);
+			printf("\nMut be between 0 and 7");
+			continue;
 		}
-		else if(c == down)
-		{
-			channel1base-=SENSITIVITY;
-			setangle(fd, channel1, channel1base, PWM);
-		}
-		else if(c == left)
-		{
-			channel2base-=SENSITIVITY;
-			setangle(fd, channel2, channel2base, PWM);
-		}       
-		else if(c == right)
-		{
-			channel2base+=SENSITIVITY;
-			setangle(fd, channel2, channel2base, PWM);
-		} 
-		else if (c == commit)
-			printf("\nCommit");
-
 		else
 		{
-			printf("\nUnknown Key. Use WASD");
+			runtime = 0; //reset runtime to 0 for presets on each PCA
+			mask = tca_channel - '0'; //convert string to int
+			command2tca(fd, mask);
+			printf("\nAt Channel: %d", mask);
+			goto pca_channel;
 		}
-		printf("\n Current Stats: Channel1: %d, Channel 2: %d\n", 
-				channel1base, 
-				channel2base);
 	}
 
+pca_channel:
+	int headbase = 1300;
+	int tailbase = 1200;
+
+	setangle(fd, &runtime, HEAD, headbase, PWM);
+	setangle(fd, &runtime, TAIL, tailbase, PWM);	
+
+	int move;
+	printf("\nPress WASD: ");
+	while ((move = getchar()) != EOF) 
+	{
+		printf("\n");
+		switch (move)
+		{
+			case '\n':
+				continue;
+			case TURNUP:
+				headbase += SENSITIVITY; 
+				break;
+			case TURNLEFT:
+				tailbase -= SENSITIVITY;
+				break;
+			case TURNDOWN:
+				headbase -= SENSITIVITY;
+				break;
+			case TURNRIGHT:
+				tailbase += SENSITIVITY;
+				break;
+			case RESET:
+				headbase = 1300;
+				tailbase = 1200;
+				break;
+			case CHANGECHANNEL:
+				goto tca_channel;
+			case TERMINATE:
+				goto clean;
+			default:
+				printf("");
+				continue;
+		}
+		setangle(fd, &runtime, HEAD, headbase, PWM);
+		setangle(fd, &runtime, TAIL, tailbase, PWM);
+		printf("\nRun: %d, Head: %d, Base: %d", runtime, headbase, tailbase);
+	}
 
 clean:
 	printf("\nTerminating Program");
 	if (fd)
+	{
 		close(fd);
-	printf("\nProgram Terminated\n");
+		printf("\nProgram Terminated\n");
 
-	return 0;
+		return 0;
+	}
 }
-
-
-
-
-
-
-
-
-
-
-

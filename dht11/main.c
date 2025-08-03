@@ -26,13 +26,13 @@ int main(void)
 {
 	struct timespec pause;
 	struct timespec start;
-	int powerlines[] = {23};
-	int datalines[]  = {24};
+	int powerlines[] = {17};
+	int datalines[]  = {27};
 	size_t size = 1;
 	enum gpiod_edge_event_type event_type;
 	uint64_t start_time, current_time = 0, event_time;
 	int response, read;
-	struct gpiod_edge_event_buffer *handshakebuffer = gpiod_edge_event_buffer_new(3);
+	struct gpiod_edge_event_buffer *handshakebuffer = gpiod_edge_event_buffer_new(2);
 	struct gpiod_edge_event_buffer *buffer = gpiod_edge_event_buffer_new(BUFFER);
 	struct gpiod_edge_event *event = NULL;
 

@@ -18,7 +18,6 @@
 /* Master definitions for communication*/
 #define I2C_DEV_PATH "/dev/i2c-1"
 
-
 /* Servo Limitations */
 #define MAXLEFT 400
 #define MAXDOWN 400
@@ -26,9 +25,10 @@
 #define MAXUP 2100
 
 /* Control Parameters */
-#define SENSITIVITY 200
+#define SENSITIVITY 100
 
 /* Controls */
+#define TOGGLE 'y'
 #define TURNUP 'w'
 #define TURNLEFT 'a'
 #define TURNDOWN 's'
@@ -41,3 +41,6 @@
 int command2tca(int fd, uint8_t channel);
 int command2pca(int fd, uint8_t reg, uint8_t data); 
 int setangle(int fd, int *runtime, uint8_t channel, int data, uint8_t prescale);
+
+int raw_command2pca(int fd, uint8_t reg, uint8_t data);
+int raw_set_angle(int fd, int channel, int data, uint8_t prescale);

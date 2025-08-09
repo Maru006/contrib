@@ -15,8 +15,27 @@ void flush()
 int main(void)
 {
 	int runtime = 0;
-	int fd = open(I2C_DEV_PATH, O_RDWR); 
-
+	int headbase = 1500;
+	int tailbase = 1000;
+	int move;
+	int fd = open(I2C_DEV_PATH, O_RDWR);
+	if (fd < 0)
+	{
+		perror("\nmain: Failed at runtime fd");
+		return -1;
+	}
+	
+	int enableTCA;
+	printf("\nEnable TCA (Yes = 'y' | No = 'n'): ");
+	if ((enableTCA = getchar()) != EOF && enableTCA == TOGGLE)
+	{
+		goto tca_channel;
+	}
+	else
+	{
+		goto pca_channel;
+	}
+	
 tca_channel:
 	int tca_channel, mask;
 	printf("\nEnter TCA Channel: ");
@@ -30,12 +49,7 @@ tca_channel:
 		{
 			goto clean;
 		}
-		else if (tca_channel < '0' || tca_channel > '7')
-		{
-			printf("\nMut be between 0 and 7");
-			continue;
-		}
-		else
+		else if (tca_channel > '0' || tca_channel < '7')
 		{
 			runtime = 0; //reset runtime to 0 for presets on each PCA
 			mask = tca_channel - '0'; //convert string to int
@@ -43,16 +57,25 @@ tca_channel:
 			printf("\nAt Channel: %d", mask);
 			goto pca_channel;
 		}
+		else
+		{
+			if (tca_channel < '0' || tca_channel > '7')
+			{
+				printf("\nMut be between 0 and 7");
+				continue;
+			}
+			else
+			{
+				perror("\ntca_channel: out of bounds");
+				return -1;
+			}
+		}
 	}
 
 pca_channel:
-	int headbase = 1300;
-	int tailbase = 1200;
-
 	setangle(fd, &runtime, HEAD, headbase, PWM);
 	setangle(fd, &runtime, TAIL, tailbase, PWM);	
 
-	int move;
 	printf("\nPress WASD: ");
 	while ((move = getchar()) != EOF) 
 	{
@@ -62,20 +85,20 @@ pca_channel:
 			case '\n':
 				continue;
 			case TURNUP:
-				headbase += SENSITIVITY; 
+				headbase -= SENSITIVITY; 
 				break;
 			case TURNLEFT:
-				tailbase -= SENSITIVITY;
-				break;
-			case TURNDOWN:
-				headbase -= SENSITIVITY;
-				break;
-			case TURNRIGHT:
 				tailbase += SENSITIVITY;
 				break;
+			case TURNDOWN:
+				headbase += SENSITIVITY;
+				break;
+			case TURNRIGHT:
+				tailbase -= SENSITIVITY;
+				break;
 			case RESET:
-				headbase = 1300;
-				tailbase = 1200;
+				headbase = 1500;
+				tailbase = 1000;
 				break;
 			case CHANGECHANNEL:
 				goto tca_channel;
@@ -87,7 +110,7 @@ pca_channel:
 		}
 		setangle(fd, &runtime, HEAD, headbase, PWM);
 		setangle(fd, &runtime, TAIL, tailbase, PWM);
-		printf("\nRun: %d, Head: %d, Base: %d", runtime, headbase, tailbase);
+		printf("\nRuntim: %d, Head: %d, Base: %d", runtime, headbase, tailbase);
 	}
 
 clean:

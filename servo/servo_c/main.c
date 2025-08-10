@@ -14,17 +14,16 @@ void flush()
 
 int main(void)
 {
-	int runtime = 0;
-	int headbase = 1500;
-	int tailbase = 1000;
-	int move;
+	int move, runtime = 0;
+	int headbase = HEADDEFAULT;
+	int tailbase = TAILDEFAULT;
 	int fd = open(I2C_DEV_PATH, O_RDWR);
 	if (fd < 0)
 	{
 		perror("\nmain: Failed at runtime fd");
 		return -1;
 	}
-	
+
 	int enableTCA;
 	printf("\nEnable TCA (Yes = 'y' | No = 'n'): ");
 	if ((enableTCA = getchar()) != EOF && enableTCA == TOGGLE)
@@ -35,9 +34,9 @@ int main(void)
 	{
 		goto pca_channel;
 	}
-	
+
 tca_channel:
-	int tca_channel, mask;
+	int tca_channel, mask, commit;
 	printf("\nEnter TCA Channel: ");
 	while ((tca_channel = getchar())!= EOF)
 	{
@@ -53,7 +52,12 @@ tca_channel:
 		{
 			runtime = 0; //reset runtime to 0 for presets on each PCA
 			mask = tca_channel - '0'; //convert string to int
-			command2tca(fd, mask);
+			commit = command2tca(fd, mask);
+			if (commit < 0)
+			{
+				printf("\nFailed to detect TCA. Resolving to PCA Channel 1 and 2");
+				goto pca_channel;
+			}
 			printf("\nAt Channel: %d", mask);
 			goto pca_channel;
 		}
@@ -97,8 +101,8 @@ pca_channel:
 				tailbase -= SENSITIVITY;
 				break;
 			case RESET:
-				headbase = 1500;
-				tailbase = 1000;
+				headbase = HEADDEFAULT;
+				tailbase = TAILDEFAULT; 
 				break;
 			case CHANGECHANNEL:
 				goto tca_channel;

@@ -1,0 +1,64 @@
+TCA9548A device Description (source: https://www.ti.com/lit/ds/symlink/tca9548a.pdf)
+
+TCA9548A device has 8 bidirectional translating switches that can be can be controlled through the i2c Bus. 
+
+The SCL and SDA upstream pair fans out to the 8 downstream chanells (or pairs - for each channel requiring an SCL and SDA input).
+
+Each channels can be selected, or "determined" via the contents of the programmable control registers. This allows the user to differentiate between identical i2c addressed devices. For example, if 8 identical digital temperature sensors are needed in an application, one sensor can be connected at each channel: 0-7.
+
+
+System Contoller and TCA9548A 
+
+In the event of an improper operation THE TCA9548A can assert a low in the RESET input. Similarly, the power-on resets deselcts all channels and initializes the i2c/SMBus state machine. However asserting RESET causes the same reset and initilization to ocur without powering down the part. This allows the recovery if one of the 8 downstream i2c buses get stuck in a low state.
+
+PULL-UP or PULL-DOWN bias
+
+The TCA9548A is constructed so that the VCC pin can be used to limit the maximum voltage. In doing so allows the use of differnt buss voltages on each pair, so that a 1.8V, 2.5V or 3.3V parts can communication with 5V parts, without additional protection. All I/O pins are 5v tolerate but an external PULL-UP resistors may be necessary to pull the bus up to the desired voltage level for each channel
+
+
+RESET  input = active-low signal 
+
+Vpoor (V POR_R) = is the RISING Threshold of the device internal power-on reset. V POR_R is the VCC voltage at which, on a rising supply, the TCA9548A releases reset and begins normal operation 
+
+Vporf = is the FALLING Threshold of the device internal power-on reset. V POR_F is the VCC voltage at wihich, on a falling supply, the device re-enters reset and isolates all channels. 
+
+POWER-ON RESET = when VCC is applied an internal power-on reset holds the TCA9548A until VCC has reached Vpoor threshold. At this point, the reset condition is released, and the TCA9548A registers and i2c state machine are intilized to their defualt states, all 0s, causing all channels to be deselected. Thereafter Vcc must be lowered below Vporf levels to reset the device
+
+Configuring TCA9548A
+
+Each target on the i2c bus has a specific device address to differentiate between other target devices that are on the same i2c bus. This is acomplished by the controller accessing internal register maps of the target which have unique register address. Device can have one or mutiple registers when data is stored, written or read.
+
+The physical i2c interface consists of the SCL and SDA lines both of which must be connected to the Vcc through a pull up resistor. The size of which is determined by the amount of the capacitance on the i2c lines. Data transfer may be initiated only when the bus is idle - if both the SDA and SCL lines are high after a STOP condition. 
+
+General Procedures
+
+Sending Data
+1. Controller-transmitter sends a START condition and addresses the target-receiver
+2. COntroller-transmitter sends data to target-receiver
+3. Controller-transmitter terminates the transfer with a STOP condition
+
+Receiving Data
+1. Controller-receiver sends a START condition and addresses the target-transmitter
+2. Controller-receiver sends the requested register to read to target-transmitter
+3. Controller-receiver receives data from the target-transmitter
+4. Controller-receiver terminates the transfer with a STOP condition
+
+TCA9658A address reference
+
+
+
+ Fixed	  Inputs	
+   |	    |			
+-------  -------  
+| | | |  |  |  |  
+1 1 1 0 a2 a1 a0 R/W
+		  |	
+		  |
+		Read = 1
+		Write = 0
+
+Inputs / "three pin" hardware-cofingurable address: tie each to GND(0) or Vcc (1). They form a 3-bit binary value that offsets the base address address of the TCA9658A (Ox70). From 0x70 up to 0x77 (8 channels).
+
+
+
+

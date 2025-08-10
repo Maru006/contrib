@@ -26,6 +26,8 @@
 
 /* Control Parameters */
 #define SENSITIVITY 100
+#define HEADDEFAULT 1000
+#define TAILDEFAULT 1000
 
 /* Controls */
 #define TOGGLE 'y'

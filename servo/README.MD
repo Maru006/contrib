@@ -1,6 +1,8 @@
-***(UNDER CONSTRUCTIONS)***
-Requires some I/O Error handling. Otherwise, TCA9648A should function well with the PCA9685.
 
+TCA9685 toggle fixed. If not detected, defaults to LED_0 and LED_1 channels. Ensure PCA9685 has servos fixed to these channels.
+-10/08/2025
+
+Requires some I/O Error handling. Otherwise, TCA9648A should function well with the PCA9685.
 -20/07/2025
 
 Added functionality (TCA9548A)

@@ -6,17 +6,11 @@
 #include <stdint.h>
 #include "utils.h"
 
-void flush()
-{
-	int c;
-	while((c = getchar()) != EOF && c != '\n');
-}
-
 int main(void)
 {
-	int move, runtime = 0;
-	int headbase = HEADDEFAULT;
-	int tailbase = TAILDEFAULT;
+	int move, head_target, headbase, tail_target, tailbase, runtime = 0;
+	headbase = head_target = HEADDEFAULT;
+	tailbase = tail_target = TAILDEFAULT;
 	int fd = open(I2C_DEV_PATH, O_RDWR);
 	if (fd < 0)
 	{
@@ -79,7 +73,7 @@ tca_channel:
 pca_channel:
 	setangle(fd, &runtime, HEAD, headbase, PWM);
 	setangle(fd, &runtime, TAIL, tailbase, PWM);	
-
+	
 	printf("\nPress WASD: ");
 	while ((move = getchar()) != EOF) 
 	{
@@ -89,21 +83,21 @@ pca_channel:
 			case '\n':
 				continue;
 			case TURNUP:
-				headbase -= SENSITIVITY; 
+				head_target = headbase - SENSITIVITY; 
 				break;
 			case TURNLEFT:
-				tailbase += SENSITIVITY;
+				tail_target = tailbase - SENSITIVITY;
 				break;
 			case TURNDOWN:
-				headbase += SENSITIVITY;
+				head_target = headbase + SENSITIVITY;
 				break;
 			case TURNRIGHT:
-				tailbase -= SENSITIVITY;
+				tail_target = tailbase + SENSITIVITY;
 				break;
 			case RESET:
-				headbase = HEADDEFAULT;
-				tailbase = TAILDEFAULT; 
-				break;
+				setangle(fd, &runtime, HEAD, headbase, PWM);
+				setangle(fd, &runtime, TAIL, tailbase, PWM);
+				continue;
 			case CHANGECHANNEL:
 				goto tca_channel;
 			case TERMINATE:
@@ -112,9 +106,9 @@ pca_channel:
 				printf("");
 				continue;
 		}
-		setangle(fd, &runtime, HEAD, headbase, PWM);
-		setangle(fd, &runtime, TAIL, tailbase, PWM);
-		printf("\nRuntim: %d, Head: %d, Base: %d", runtime, headbase, tailbase);
+		setmove(&headbase, &head_target, fd, &runtime, HEAD, PWM);
+		setmove(&tailbase, &tail_target, fd, &runtime, TAIL, PWM);
+		printf("\nRuntime: %d, Head: %d, Base: %d", runtime, headbase, tailbase);
 	}
 
 clean:

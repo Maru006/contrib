@@ -1,11 +1,11 @@
-#include <stdio.h>        		// printf, fprintff, perror
-#include <string.h>       		// strstr(), snprintf()
+#include <stdio.h>        		
+#include <string.h>       		
 #include <stdlib.h>
 #include <unistd.h>
 #include <bluetooth/bluetooth.h>	//Bluez bluetooth stack: ba2str, bdaddr_t
 #include <bluetooth/hci.h>		//Bluez Low level interface -> Bluetooth adapter 
 #include <bluetooth/hci_lib.h>
-#include <bluetooth/rfcomm.h>		//connecting to known MAC
+#include <bluetooth/rfcomm.h>
 #include <dbus/dbus.h>
 #include "utils.h"
 

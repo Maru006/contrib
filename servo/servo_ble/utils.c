@@ -7,43 +7,10 @@
 #include <bluetooth/hci_lib.h>
 #include <bluetooth/rfcomm.h>		//connecting to known MAC
 #include <dbus/dbus.h>
-
-char *connect_device(const char *target)
-{
-	printf("\nConnecting...");
-	struct sockaddr_rc addr = {
-		.rc_family = AF_BLUETOOTH,
-		.rc_bdaddr = { 0 },
-		.rc_channel = (uint8_t) 1,
-	};
-	str2ba(target, &addr.rc_bdaddr);
-	int tunnel = socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
-
-	int enable_traffic = connect(tunnel, (struct sockaddr *)&addr, sizeof(addr));
-	if (enable_traffic < 0)
-	{
-		perror("connect_devices: Issue enable_traffic at connect");
-		goto clean;
-	}
-	else
-	{
-		printf("\nconnect_devices: Connected to %s", target);
-		char connection[19] = { 0 }; 
-		ba2str(&(addr.rc_bdaddr), connection);
-		return strdup(connection);
-	}
+#include "utils.h"
 
 
-clean:
-	if (tunnel)
-	{
-		close(tunnel);
-	}
-	return 0;
-}
-
-
-int dbus_call(const char *target, const char *method)
+int dbus_call(const char *target, const char *interface, const char *method)
 {
 	int ret= -1;
 
@@ -62,13 +29,13 @@ int dbus_call(const char *target, const char *method)
 		goto clean;
 	}
 
-	form = dbus_message_new_method_call("org.bluez", target, "org.bluez.Device1", method);
+	form = dbus_message_new_method_call("org.bluez", target, interface, method);
 	if (!form) 
 	{
 		fprintf(stderr, "\ndbus_call: Failed to create message");
 		goto clean;
 	}
-	
+
 	if (!dbus_connection_send_with_reply(conn, form, &send, -1)) {
 		fprintf(stderr, "\ndbus_call: Failed to send with reply");
 		goto clean;
@@ -90,64 +57,83 @@ int dbus_call(const char *target, const char *method)
 	if (dbus_message_get_type(reply) == DBUS_MESSAGE_TYPE_ERROR) 
 	{
 		const char *err_name = dbus_message_get_error_name(reply);
-		fprintf(stderr, "dbus_call: D-Bus returned error: %s\n", err_name ? err_name : "(unknown)");
+		fprintf(stderr, "\ndbus_call: D-Bus returned error: %s\n", err_name ? err_name : "\n (unknown error)");
 		goto clean;
 	}
 
-	printf("%s success\n", method);
+	fprintf(stdout, "%sdbus_call: success\n", method);
 
 	ret = 0;
 
 clean:
 	if (dbus_error_is_set(&error)) 
 	{
-		fprintf(stderr, "dbus_call error: %s\n", error.message);
+		fprintf(stderr, "\ndbus_call: remaining error: %s\n", error.message);
 		dbus_error_free(&error);
 	}
-	if (reply) dbus_message_unref(reply);
-	if (send) dbus_pending_call_unref(send);
-	if (form) dbus_message_unref(form);
+	if (reply)
+		dbus_message_unref(reply);
+	
+	if (send)
+		dbus_pending_call_unref(send);
+
+	if (form)
+		dbus_message_unref(form);
+
+	fprintf(stdout, "\ndbus_call: clean sucess");
+
 	return ret;
 }
 
-
 int search_device (char *target, char *device_mac, size_t mac_len)
 {
-	int max_ret = 10, len = 5, flags = IREQ_CACHE_FLUSH; 	
+	int max_ret = 10;
+	int search_time = 5; //units of 1.28 seconds
+	int flags = IREQ_CACHE_FLUSH; 	
+
+	if(dbus_call(BLE_ADAPTER, ADAPTER_1, "StartDiscovery"))
+	{
+		fprintf(stderr, "\nsearch_device: Issue starting Discovery");
+		goto clean;
+	}
+	else
+		fprintf(stdout, "\nSearching for %s...", target);
+	
+	sleep(10);
+	if(dbus_call(BLE_ADAPTER, ADAPTER_1, "StopDiscovery"))
+	{
+		fprintf(stderr, "\nsearch_device: Issue stopping Discovery");
+		goto clean;
+	}	
 
 	int dev_id = hci_get_route(NULL); 
 	if (dev_id <0)
 	{
-		perror("search_devices: Issue at: hci_get_route");
+		fprintf(stderr, "\nsearch_device: Issue at: hci_get_route");
 		goto clean;
 	} 
 	else 
 	{
-		printf("\nsearch_devices: Local adapter found");
+		fprintf(stdin, "\nsearch_device: Local adapter found");
 	}
 
 	int tunnel = hci_open_dev(dev_id);
 	if (tunnel < 0)
 	{
-		perror("search_devices: Issue at: hci_open_dev");
+		fprintf(stderr, "\nsearch_device: Issue at: hci_open_dev");
 		goto clean;
 	}
-	else
-	{
-		printf("\nsearch_devices: Socket Openned");
-
-	}
-
+	fprintf(stdout, "\nsearch_device: Searching for %s", target);
 	inquiry_info *ret = NULL; 
-	int count_ret = hci_inquiry(dev_id, len, max_ret, NULL, &ret, flags);
+	int count_ret = hci_inquiry(dev_id, search_time, max_ret, NULL, &ret, flags);
 	if (count_ret < 0)
 	{
-		perror("Issue searching");
+		fprintf(stderr, "\nsearch_device: Issue searching");
 		goto clean;
 	}
 	else
 	{
-		printf("\nsearch_devices: Total devices detected %d", count_ret);
+		fprintf(stdout, "\nsearch_device: Total devices detected %d", count_ret);
 	}
 
 	char addr[19], name[248]; 
@@ -160,32 +146,41 @@ int search_device (char *target, char *device_mac, size_t mac_len)
 		read_ret = hci_read_remote_name(tunnel, &(ret[i].bdaddr), sizeof(name), name, 0);
 		if (read_ret < 0)
 		{
-			printf("\nsearch_devices: No device name retreived at read_ret");
+			printf("\nsearch_device: No device name retreived at read_ret");
 			goto clean;
 		}
 
 		if (strcmp(name, target) == 0) 
 		{
-			printf("\nsearch_devices: Target Matched: Name: %s with MAC address: %s", name, addr);
-			strncpy(device_mac, addr, mac_len - 1);
+			fprintf(stdout, "\nsearch_device: Target Matched: Name: %s with MAC address: %s", name, addr);
+			strncpy(device_mac, addr, mac_len- 1);
 			goto clean;
 		}
-		printf("\nOther Devices found: {Name: %s},{MAC: %s}", name, addr);
+		fprintf(stdout, "\nsearch_device: Other Devices found: {Name: %s},{MAC: %s}", name, addr);
 	}
 
 clean:
 	if (ret != NULL)
 	{
 		free(ret);
-		printf("\nFree results");
+		fprintf(stdout, "\nsearch_device: Free results");
 	}
 	if (tunnel >= 0)
 	{
 		close(tunnel);
-		printf("\nFree tunnel");
+		fprintf(stdout, "\nsearch_device: Free tunnel");
 	}
-	printf("\n");
-	return 0;
+	if (read_ret < 0)
+	{
+		return -1;
+	}
+	if (read_ret > 0)
+	{
+		return 0;
+	}
+	fprintf(stdout, "\nsearch_device: clean sucess");
 }
+
+
 
 

@@ -1,10 +1,19 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#define BITDO "/dev/input/js0"
-#define BITDOMAC 
-#define AXIS_DEADZOE 2000000
-#endif
+#define BLE_ADAPTER "/org/bluez/hci0"
+#define DEVICE_1 "org.bluez.Device1"
+#define ADAPTER_1 "org.bluez.Adapter1"
+
+#define AXIS_DEADZONE 2000000
+#define DEVICE_PATH "/proc/bus/input/devices"
+#define DEVICE_INPUT_PATH "/dev/input/event"
+
+#define PATH_BUFFER 126
+#define BUFF_SIZE 4096
+#define BLE_PATH_BUFFER 256
+#define DEVICE_MAC_BUFFER 19
+
 /* 		----------Events----------
  * Event type 0 (EV_SYN)
   Event type 1 (EV_KEY)
@@ -46,8 +55,7 @@
       Min        0
       Max      255		DOWN-RIGHT
       Flat      15
-		----------RIGHT JOYSTICK---------ear
-		sudo 4<F4><F4><F4><F4><F4><F4><F4><F4>
+		----------RIGHT JOYSTICK-----------
     Event code 2 (ABS_Z)
       Value    127		DOWN
       Min        0		UP-LEFT
@@ -94,7 +102,8 @@
     Event code 4 (MSC_SCAN)
 */
 
-char *search_device(char *target, char *device_mac, size_t mac_len);
-void connect_device(char *target);
-int dbus_call(const char *target, const char *method);
+int search_device(char *target, char *device_mac, size_t mac_len);
 
+int dbus_call(const char *target, const char* interface, const char *method);
+
+#endif

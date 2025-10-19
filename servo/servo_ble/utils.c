@@ -532,8 +532,10 @@ char *read_event(char *path)
 {
 	struct input_event ev;
 	int move, head_target, headbase, tail_target, tailbase, runtime = 0;
-	headbase = head_target = HEADDEFAULT;
-	tailbase = tail_target = TAILDEFAULT;
+	headbase = HEADDEFAULT;
+	head_target = HEADDEFAULT;
+	tailbase = TAILDEFAULT;
+	tail_target = TAILDEFAULT;
 
 	int event_file = open(path, O_RDONLY);
 	if (event_file < 0)
@@ -548,9 +550,9 @@ char *read_event(char *path)
 		fprintf(stderr, "\nread_event: Failed to open I2C path");
 		goto clean;
 	}
-
-	setangle(i2c_file, &runtime, HEAD, headbase, PWM);
-	setangle(i2c_file, &runtime, TAIL, tailbase, PWM);
+	
+	setangle(fd, &runtime, HEAD, headbase, PWM);
+	setangle(fd, &runtime, TAIL, tailbase, PWM);
 
 	while (1)
 	{
@@ -559,10 +561,15 @@ char *read_event(char *path)
 		{
 			if (ev.type == EV_KEY) 
 			{
-				printf("Button code=%u value=%d\n", ev.code, ev.value);
+				fprintf(stdout, "\nButton code=%u value=%d\n", ev.code, ev.value);
 				if (ev.code == JS_EXIT)
 					break;
-				else if (ev.code == JS_VERTICAL && ev.value == JS_UP)
+
+			} 
+			else if (ev.type == EV_ABS) 
+			{
+				fprintf(stdout, "\nAxis code=%u value=%d\n", ev.code, ev.value);
+				if (ev.code == JS_VERTICAL && ev.value == JS_UP)
 					head_target = headbase - SENSITIVITY;
 				else if (ev.code == JS_VERTICAL && ev.value == JS_DOWN)
 					head_target = headbase + SENSITIVITY;
@@ -570,24 +577,21 @@ char *read_event(char *path)
 					head_target = tailbase - SENSITIVITY;
 				else if (ev.code == JS_HORIZONTAL && ev.value == JS_RIGHT)
 					head_target = tailbase + SENSITIVITY;
+				
 				setmove(&headbase, &head_target, i2c_file, &runtime, HEAD, PWM);
 				setmove(&tailbase, &tail_target, i2c_file, &runtime, TAIL, PWM);
 				fprintf(stdout, "\nread_event: %d, Head: %d, Base: %d", runtime, headbase, tailbase);
-
-			} 
-			else if (ev.type == EV_ABS) 
-			{
-				printf("Axis code=%u value=%d\n", ev.code, ev.value);
 			} 
 			else if (ev.type == EV_SYN) 
 			{
-				printf("---- end ----\n");
+				fprintf(stdout, "\n---- end ----\n");
 			}
 			fflush(stdout);
 		}
 		else
 		{
 			fprintf(stderr, "\nread_event: Error with read");
+			fflush(stderr);
 			break;
 		}
 

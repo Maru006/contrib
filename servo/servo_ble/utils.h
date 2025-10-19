@@ -5,11 +5,50 @@
 #define DEVICE_1 "org.bluez.Device1"
 #define ADAPTER_1 "org.bluez.Adapter1"
 #define DEVICES "/proc/bus/input/devices"
-#define DEVICE_INPUT_PATH "/dev/input"
+#define DEVICE_INPUT_PATH "/dev/input/"
 
 #define PATH_BUFFER 126
 #define BUFF_SIZE 4096
 #define DEVICE_MAC_BUFFER 19
+
+#define UPDATE_RATE 50
+#define PWM 35
+#define PCA9685_OSC_CLOCK 25000000
+
+/* PCA9685 DATASHEET REGISTERS*/
+#define MODE1 0x00
+#define PCA 0x40
+#define HEAD 0x0A //PCA LED0_ON_H
+#define TAIL 0x06 //PCA LED1_ON_L
+#define PRESCALE 0xFE
+
+/* TCA9548A DATASHEET REGISTERS*/
+#define MUX 0x70
+
+/* Master definitions for communication*/
+#define I2C_DEV_PATH "/dev/i2c-1"
+
+/* Servo Limitations */
+#define MAXLEFT 400
+#define MAXDOWN 400
+#define MAXRIGHT 2200
+#define MAXUP 2100
+
+/* Control Parameters */
+#define SENSITIVITY 100
+#define SMOOTHNESS 5
+#define HEADDEFAULT 1400
+#define TAILDEFAULT 1100
+
+/* Controls */
+#define TOGGLE 'y'
+#define TURNUP 'w'
+#define TURNLEFT 'a'
+#define TURNDOWN 's'
+#define TURNRIGHT 'd'
+#define RESET 'r'
+#define CHANGECHANNEL 'c'
+#define TERMINATE 27 // keyboard 'ESC' key
 
 extern char *device_path;
 
@@ -101,6 +140,7 @@ extern char *device_path;
     Event code 4 (MSC_SCAN)
 */
 
+//BLE
 int hcisearch_device (DBusConnection *conn, DBusError *err, char *target, char *device_mac, size_t mac_len);
 
 int dbus_call(DBusConnection *conn, DBusError *err, const char *target, const char *interface, const char *method);
@@ -111,7 +151,16 @@ void format_path(char *in);
 
 char *read_device(char *target, char* path);
 
-char *read_event(const char *path);
+char *read_event(char* path);
+
+// WASD
+int command2tca(int fd, uint8_t channel);
+
+int command2pca(int fd, uint8_t reg, uint8_t data); 
+
+int setangle(int fd, int *runtime, uint8_t channel, int data, uint8_t prescale);
+
+int setmove(int *target, int *reference, int fd, int *runtime, uint8_t channel, uint8_t prescale);
 
 #endif
 

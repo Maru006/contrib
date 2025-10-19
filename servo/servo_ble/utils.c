@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -7,6 +8,10 @@
 #include <bluetooth/hci.h>		
 #include <bluetooth/hci_lib.h>
 #include <dbus/dbus.h>
+#include <linux/input.h>
+#include <time.h>
+#include <sys/ioctl.h>
+#include <linux/i2c-dev.h>
 #include "utils.h"
 
 
@@ -317,50 +322,53 @@ char *read_device(char *target, char* path)
 	char event_num [8] = { 0 };
 	int device_flag = 0;
 	char *event_str = NULL;
-
-	int device_file = open(path, O_RDONLY);
-	if (device_file < 0)
+	int device_file = -1;
+	int count = 0;
+	while(count < 3)
 	{
-		fprintf(stderr, "\nread_device: Failed to read device path");
-		goto clean;
-	}
-
-	ssize_t read_contents;
-	while ((read_contents = read(device_file, file_contents, BUFF_SIZE - 1)) > 0) 
-	{
-		file_contents[read_contents] = '\0';
-
-		char *line = strtok(file_contents, "\n");
-		while (line != NULL)
+		device_file = open(path, O_RDONLY);
+		if (device_file < 0)
 		{
-			printf("\nLine: %s", line);
-			if (strstr(line, "Name=") && strstr(line, target))
+			fprintf(stderr, "\nread_device: Failed to read device path");
+			goto clean;
+		}
+
+		ssize_t read_contents;
+		while ((read_contents = read(device_file, file_contents, BUFF_SIZE - 1)) > 0) 
+		{
+			file_contents[read_contents] = '\0';
+
+			char *line = strtok(file_contents, "\n");
+			while (line != NULL)
 			{
-				device_flag = 1;
-			}
-			else  if (device_flag && strstr(line, "Handlers")) 
-			{
-				char *event = strstr(line, "event");
-				if (event)
+				printf("\n%s", line);
+				if (strstr(line, "Name=") && strstr(line, target))
 				{
-					sscanf(event, "event%7s", event_num);
-					device_flag = 0;
-					break;
+					device_flag = 1;
 				}
+				else if (device_flag && strstr(line, "Handlers")) 
+				{
+					char *event = strstr(line, "event");
+					if (event)
+					{
+						sscanf(event, "event%7s", event_num);
+						device_flag = 0;
+						break;
+					}
+				}
+				line = strtok(NULL, "\n");
 			}
-			line = strtok(NULL, "\n");
 		}
-		if (event_num[0] != 0)
-		{
-			break;
-		}
+		close(device_file);
+		fprintf(stdout, "\nread_device: Reattempt %d", ++count);
+		sleep(2);
 	}
 	if (event_num[0] == 0)
 	{
 		fprintf(stderr, "\nread_device: Device descriptor not found");
 		goto clean;
 	}
-	
+
 	event_str = malloc(PATH_BUFFER);
 	if(!event_str)
 	{
@@ -378,19 +386,188 @@ clean:
 	return event_str;
 }
 
-char *read_event(const char *path)
+char *read_event(char *path)
 {
-	char *event_buff = NULL;
-	int file = open(path, RDONLY);
+	struct input_event ev;
+
+	int file = open(path, O_RDONLY);
 	if (file < 0)
 	{
 		fprintf(stderr, "\nread_event: Failed to open event file");
 		goto clean;
 	}
 
+	while (1)
+	{
+		ssize_t n = read(file, &ev, sizeof(ev));
+		if (n == sizeof(ev))
+		{
+			if (ev.type == EV_KEY) 
+			{
+				printf("Button code=%u value=%d\n", ev.code, ev.value);
+				if (ev.code == 316)
+					break;
+			} 
+			else if (ev.type == EV_ABS) 
+			{
+				printf("Axis code=%u value=%d\n", ev.code, ev.value);
+			} 
+			else if (ev.type == EV_SYN) 
+			{
+				printf("---- end ----\n");
+			}
+			fflush(stdout);
+		}
+		else
+		{
+			fprintf(stderr, "\nread_event: Error with read");
+			break;
+		}
+
+	}
 clean:
 	if (file >= 0)
 		close(file);
+}
 
-	return event_buff;
+// WASD
+
+int command2tca(int fd, uint8_t channel)
+{
+	if (channel < 7)
+	{
+		if (ioctl(fd, I2C_SLAVE, MUX) < 0)
+		{
+			perror("\ncommand2tca: Failed to select mux");
+			return -1;
+		}
+		else
+		{
+			printf("\ncommand2tca: SUCCESS");
+			uint8_t mask = 1 << channel; 
+			int commitchannel = write(fd, &mask, 1); 
+			if (commitchannel != 1) // 1 as n = byte to be written
+			{
+				perror("\ncommand2tca: Failed commit channel");
+				return -1;
+			}
+		}
+	}
+	else
+	{
+		printf("\nChannel must be between 0 and 7");
+		return -1;
+	}
+	printf("\nSuccess: TCA(%d), channels: %hhu\n", fd, channel);
+	return 0; // does not affect while(1). Only main()
+}
+
+int command2pca(int fd, uint8_t reg, uint8_t data)
+{
+	if (ioctl(fd, I2C_SLAVE, PCA) < 0)
+	{
+		perror("\ncommand2pca: Failed to select PCA");
+		return -1;
+	}
+	else 
+	{
+		uint8_t buffer[2] = {reg, data};
+		int commit = write(fd, buffer, 2);
+		if (commit != 2)
+		{
+			perror("\ncommand2pca: Failed to commit command");
+			return -1;
+		}
+	}
+	return 0; // does not affect while(1). Only main()
+}
+
+int setangle(int fd, int *runtime, uint8_t channel, int data, uint8_t prescale)
+{
+	struct timespec pause;	
+
+	// runetime != NULL checks if the pointer exists
+	if (runtime != NULL && (*runtime) == 0)
+	{
+		printf("\nFirst runtime commands");
+		printf("\nPutting Device to sleep: Mode1 to 0x10");
+		int set_mode0 = command2pca(fd, MODE1, 0x10);
+		if(set_mode0 < 0)
+		{
+			perror("\nsetangle: Issue Setting MODE 1 as: ");
+			return -1;
+		}
+		int auto_increment = command2pca(fd, MODE1, 0xA1);
+		if (auto_increment < 0)
+		{
+			perror("\nsetangle: Issue Setting AUTOINCREMENT");
+		}
+		int set_prescale = command2pca(fd, PRESCALE, prescale);
+		if(set_prescale < 0)
+		{
+			perror("\nsetangle: Issue Setting PRESCALE as: ");
+			return -1;	
+		}
+		command2pca(fd, channel, 0x00);
+		command2pca(fd, channel +1, 0x00);
+		//printf("\nOn at channels: %d, %d", channel, channel+1);
+
+		command2pca(fd,channel +2, data & 0xFF); //0xFF is 1111 1111
+		command2pca(fd, channel +3, (data >> 8) & 0xFF);
+		//printf("\nOff at channels: %d, %d", channel+2, channel+3);
+
+		pause.tv_sec = 0;
+		pause.tv_nsec = 5000000;
+		nanosleep(&pause, NULL);
+
+		//printf("\nWaking Up Device Mode1 as 0x00");
+		command2pca(fd, MODE1, 0x00);
+		
+		(*runtime)++;
+	}
+	else 
+	{
+		command2pca(fd, channel, 0x00);
+		command2pca(fd, channel +1, 0x00);
+		//printf("\nOn at channels: %d, %d", channel, channel+1);
+
+		command2pca(fd,channel +2, data & 0xFF); //0xFF is 1111 1111
+		command2pca(fd, channel +3, (data >> 8) & 0xFF);
+		// printf("\nOff at channels: %d, %d", channel+2, channel+3);
+
+		pause.tv_sec = 0;
+		pause.tv_nsec = 5000000;
+		nanosleep(&pause, NULL);
+
+		//printf("\nWaking Up Device: Mode1 as 0x00");
+		command2pca(fd, MODE1, 0x00);
+
+		(*runtime)++;
+	}
+	return 0;
+}
+
+int setmove(int *reference, int *target, int fd, int *runtime, uint8_t channel, uint8_t prescale)
+{
+	struct timespec pause = 
+	{
+		.tv_sec = 0,
+		.tv_nsec = 15000000L
+	};
+	
+	while (*reference != *target)
+	{
+		if (*reference < *target)
+		{
+			*reference += SMOOTHNESS;
+		}
+		else
+		{
+			*reference -= SMOOTHNESS;
+		}
+		nanosleep(&pause, NULL);
+		setangle(fd, runtime, channel, *reference, prescale);
+		printf("\nTarget: %d Reference: %d", *target, *reference);
+	}
+	return 0;
 }

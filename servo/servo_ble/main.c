@@ -32,6 +32,7 @@ int main(int argc, char *argv[])
 	char ble_path[PATH_BUFFER] = {0};
 	char *mask_path = NULL;
 	char *event_buff = NULL;
+
 	DBusError err; 
 	dbus_error_init(&err); 
 	DBusConnection *conn = dbus_bus_get(DBUS_BUS_SYSTEM, &err); 
@@ -53,30 +54,24 @@ int main(int argc, char *argv[])
 		goto clean;
 	
 	mask_path = read_device(device_name, DEVICES);
-	sleep(2);
 	if (!mask_path)
 	{
 		fprintf(stderr,"\nmain: Issue finding device input path");
 		goto clean;
 	}
 	fprintf(stdout, "\nmain: mask_path: %s",mask_path);
-
+	
+	printf("\nBegin inputs");
 	event_buff = read_event(mask_path);
-	if (!event_buff)
-	{
-		fprintf(stderr, "\nmain: No events queued");
-		goto clean;
-	}
 	
 
 clean:
-	sleep(60);
 	if(dbus_call(conn, &err, BLE_ADAPTER, ADAPTER_1, "RemoveDevice") < 0)	
 		fprintf(stdout, "\nmain: Issue Disconnecting (Forgetting) Device");
 
 	if(mask_path)
 		free(mask_path);
-
+	
 	if(event_buff)
 		free(event_buff);
 

@@ -551,8 +551,8 @@ char *read_event(char *path)
 		goto clean;
 	}
 	
-	setangle(fd, &runtime, HEAD, headbase, PWM);
-	setangle(fd, &runtime, TAIL, tailbase, PWM);
+	setangle(i2c_file, &runtime, HEAD, headbase, PWM);
+	setangle(i2c_file, &runtime, TAIL, tailbase, PWM);
 
 	while (1)
 	{
@@ -580,7 +580,7 @@ char *read_event(char *path)
 				
 				setmove(&headbase, &head_target, i2c_file, &runtime, HEAD, PWM);
 				setmove(&tailbase, &tail_target, i2c_file, &runtime, TAIL, PWM);
-				fprintf(stdout, "\nread_event: %d, Head: %d, Base: %d", runtime, headbase, tailbase);
+				fprintf(stdout, "\nread_event: %d, Head: %d, Tail: %d", runtime, headbase, tailbase);
 			} 
 			else if (ev.type == EV_SYN) 
 			{

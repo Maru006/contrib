@@ -40,15 +40,24 @@
 #define HEADDEFAULT 1400
 #define TAILDEFAULT 1100
 
-/* Controls */
-#define TOGGLE 'y'
-#define TURNUP 'w'
-#define TURNLEFT 'a'
-#define TURNDOWN 's'
-#define TURNRIGHT 'd'
-#define RESET 'r'
-#define CHANGECHANNEL 'c'
-#define TERMINATE 27 // keyboard 'ESC' key
+/* Keyboard Controls */
+#define KB_TOGGLE_YES 'y'
+#define KB_UP 'w'
+#define KB_LEFT 'a'
+#define KB_DOWN 's'
+#define KB_RIGHT 'd'
+#define KB_RESET 'r'
+#define KB_CHANGECHANNEL 'c'
+#define KB_EXIT 27 // keyboard 'ESC' key
+
+/*Joystick Controls*/
+#define JS_EXIT 316, 1
+#define JS_VERTICAL 17
+#define JS_HORIZONTAL 16
+#define JS_UP -1
+#define JS_LEFT -1
+#define JS_DOWN 1
+#define JS_RIGHT 1
 
 extern char *device_path;
 

@@ -386,50 +386,6 @@ clean:
 	return event_str;
 }
 
-char *read_event(char *path)
-{
-	struct input_event ev;
-
-	int file = open(path, O_RDONLY);
-	if (file < 0)
-	{
-		fprintf(stderr, "\nread_event: Failed to open event file");
-		goto clean;
-	}
-
-	while (1)
-	{
-		ssize_t n = read(file, &ev, sizeof(ev));
-		if (n == sizeof(ev))
-		{
-			if (ev.type == EV_KEY) 
-			{
-				printf("Button code=%u value=%d\n", ev.code, ev.value);
-				if (ev.code == 316)
-					break;
-			} 
-			else if (ev.type == EV_ABS) 
-			{
-				printf("Axis code=%u value=%d\n", ev.code, ev.value);
-			} 
-			else if (ev.type == EV_SYN) 
-			{
-				printf("---- end ----\n");
-			}
-			fflush(stdout);
-		}
-		else
-		{
-			fprintf(stderr, "\nread_event: Error with read");
-			break;
-		}
-
-	}
-clean:
-	if (file >= 0)
-		close(file);
-}
-
 // WASD
 
 int command2tca(int fd, uint8_t channel)
@@ -570,4 +526,76 @@ int setmove(int *reference, int *target, int fd, int *runtime, uint8_t channel, 
 		printf("\nTarget: %d Reference: %d", *target, *reference);
 	}
 	return 0;
+}
+
+char *read_event(char *path)
+{
+	struct input_event ev;
+	int move, head_target, headbase, tail_target, tailbase, runtime = 0;
+	headbase = head_target = HEADDEFAULT;
+	tailbase = tail_target = TAILDEFAULT;
+
+	int event_file = open(path, O_RDONLY);
+	if (event_file < 0)
+	{
+		fprintf(stderr, "\nread_event: Failed to open event file");
+		goto clean;
+	}
+	
+	int i2c_file = open(I2C_DEV_PATH, O_RDWR);
+	if (i2c_file < 0)
+	{
+		fprintf(stderr, "\nread_event: Failed to open I2C path");
+		goto clean;
+	}
+
+	setangle(i2c_file, &runtime, HEAD, headbase, PWM);
+	setangle(i2c_file, &runtime, TAIL, tailbase, PWM);
+
+	while (1)
+	{
+		ssize_t n = read(event_file, &ev, sizeof(ev));
+		if (n == sizeof(ev))
+		{
+			if (ev.type == EV_KEY) 
+			{
+				printf("Button code=%u value=%d\n", ev.code, ev.value);
+				if (ev.code == JS_EXIT)
+					break;
+				else if (ev.code == JS_VERTICAL && ev.value == JS_UP)
+					head_target = headbase - SENSITIVITY;
+				else if (ev.code == JS_VERTICAL && ev.value == JS_DOWN)
+					head_target = headbase + SENSITIVITY;
+				else if (ev.code == JS_HORIZONTAL && ev.value == JS_LEFT)
+					head_target = tailbase - SENSITIVITY;
+				else if (ev.code == JS_HORIZONTAL && ev.value == JS_RIGHT)
+					head_target = tailbase + SENSITIVITY;
+				setmove(&headbase, &head_target, i2c_file, &runtime, HEAD, PWM);
+				setmove(&tailbase, &tail_target, i2c_file, &runtime, TAIL, PWM);
+				fprintf(stdout, "\nread_event: %d, Head: %d, Base: %d", runtime, headbase, tailbase);
+
+			} 
+			else if (ev.type == EV_ABS) 
+			{
+				printf("Axis code=%u value=%d\n", ev.code, ev.value);
+			} 
+			else if (ev.type == EV_SYN) 
+			{
+				printf("---- end ----\n");
+			}
+			fflush(stdout);
+		}
+		else
+		{
+			fprintf(stderr, "\nread_event: Error with read");
+			break;
+		}
+
+	}
+clean:
+	if (event_file >= 0)
+		close(event_file);
+
+	if (i2c_file >= 0)
+		close(i2c_file);
 }

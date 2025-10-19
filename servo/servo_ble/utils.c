@@ -574,9 +574,9 @@ char *read_event(char *path)
 				else if (ev.code == JS_VERTICAL && ev.value == JS_DOWN)
 					head_target = headbase + SENSITIVITY;
 				else if (ev.code == JS_HORIZONTAL && ev.value == JS_LEFT)
-					head_target = tailbase - SENSITIVITY;
+					tail_target = tailbase - SENSITIVITY;
 				else if (ev.code == JS_HORIZONTAL && ev.value == JS_RIGHT)
-					head_target = tailbase + SENSITIVITY;
+					tail_target = tailbase + SENSITIVITY;
 				
 				setmove(&headbase, &head_target, i2c_file, &runtime, HEAD, PWM);
 				setmove(&tailbase, &tail_target, i2c_file, &runtime, TAIL, PWM);

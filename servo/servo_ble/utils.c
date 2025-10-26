@@ -19,21 +19,20 @@ int dbus_call(DBusConnection *conn, DBusError *err, char *target, char *interfac
 {
 	int ret= -1;
 	
-	char *err_key = NULL;
-	
-	char *err_value = NULL;
+	char *err_key = NULL, *err_value = NULL;
 
-	DBusMessage *msg = NULL;
+	DBusMessage *msg = NULL, *reply = NULL;
 	
 	DBusPendingCall *pending = NULL;
 	
-	DBusMessage *reply = NULL;
+	DBusMessageIter headers = { 0 }, err_args = { 0 };
 
 	msg = dbus_message_new_method_call("org.bluez", target, interface, method);
 	
 	if (!msg)
 	{
 		fprintf(stderr, "\ndbus_call: Failed to create message");
+
 		goto clean;
 	}
 	
@@ -42,29 +41,29 @@ int dbus_call(DBusConnection *conn, DBusError *err, char *target, char *interfac
 		if (!device_path)
 		{
 			fprintf(stderr,"\ndbus_call: unknown device_path. Requires dbusdiscover_device");
+
 			goto clean;
 		}
 
-		DBusMessageIter header;
+		dbus_message_iter_init_append(msg, &headers);
 
-		dbus_message_iter_init_append(msg, &header);
-		
-		//requires device mac address via extern device_path
-		if (!dbus_message_iter_append_basic(&header, DBUS_TYPE_OBJECT_PATH, &device_path))
+		if (!dbus_message_iter_append_basic(&headers, DBUS_TYPE_OBJECT_PATH, &device_path))
 		{
 			fprintf(stderr, "\ndbus_call: Failed to append header");
+
 			goto clean;
 		}
 	}
 	
-	//blocking
 	if (!dbus_connection_send_with_reply(conn, msg, &pending, -1)) 
 	{
 		fprintf(stderr, "\ndbus_call: Failed to send with reply");
+
 		goto clean;
 	}
 
-	dbus_message_unref(msg); 
+	dbus_message_unref(msg);
+
 	msg = NULL;
 
 	dbus_pending_call_block(pending); 
@@ -74,31 +73,33 @@ int dbus_call(DBusConnection *conn, DBusError *err, char *target, char *interfac
 	if (!reply) 
 	{
 		fprintf(stderr, "\ndbus_call: Failed %s; No reply from D-Bus\n", method);
+
 		goto clean;
 	}
 
 	if (dbus_message_get_type(reply) == DBUS_MESSAGE_TYPE_ERROR) 
 	{
 		err_key = dbus_message_get_error_name(reply);
-		fprintf(stderr,	"\ndbus_call: Failed %s {D-Bus returned error: %s}",
-				method, err_key ? err_key : "\n (unknown error)");
 
-		DBusMessageIter args;
-		if (dbus_message_iter_init(reply, &args) && 
-				dbus_message_iter_get_arg_type(&args) == DBUS_TYPE_STRING)
+		fprintf(stderr,	"\ndbus_call: Failed %s {D-Bus returned error: %s}", method, err_key ? err_key : "\n (unknown error)");
+
+		if (dbus_message_iter_init(reply, &err_args) && dbus_message_iter_get_arg_type(&err_args) == DBUS_TYPE_STRING)
 		{
-			dbus_message_iter_get_basic(&args, &err_value);
+			dbus_message_iter_get_basic(&err_args, &err_value);
+
 			fprintf(stderr, "\ndbus_call: Error Message %s", err_value ? err_value : "(none)");
 		}
 		goto clean;
 	}
-	fprintf(stdout, "\ndbus_call: %s success", method);
+	fprintf(stdout, "\ndbus_call: %s on %c sucess", method, target);
+
 	ret = 0;
 
 clean:
 	if (dbus_error_is_set(err)) 
 	{
 		fprintf(stderr, "\ndbus_call: remaining error: %s", err->message);
+
 		dbus_error_free(err);
 	}
 	if (reply)
@@ -111,24 +112,28 @@ clean:
 		dbus_message_unref(msg);
 
 	fprintf(stdout, "\ndbus_call: clean sucess");
+
 	return ret;
 }
 
 int hcisearch_device (DBusConnection *conn, DBusError *err, char *target, char *device_mac, size_t mac_len)
 {
-	fprintf(stdout, "\nsearch_device: HCI searching for %s", target);
+	fprintf(stdout, "\nhcisearch_device: searching for %s", target);
 
-	int max_ret = 10;
-	int search_time = 5; //units of 1.28 seconds
-	int flags = IREQ_CACHE_FLUSH; 	
+	int ret = -1, read_ret = -1;
+
+	int max_ret = 10, search_time = 5, flags = IREQ_CACHE_FLUSH; 
+
 	char dev_addr[19], name[248]; 
-	int read_ret = -1;
-	int user_input;
 
 	int dev_id = hci_get_route(NULL); 
+
+	inquiry_info *inquiry_ret = NULL;
+
 	if (dev_id <0)
 	{
 		fprintf(stderr, "\nsearch_device: Issue at: hci_get_route");
+
 		goto clean;
 	} 
 	else 
@@ -136,17 +141,21 @@ int hcisearch_device (DBusConnection *conn, DBusError *err, char *target, char *
 		fprintf(stdout, "\nsearch_device: Local adapter found");
 	}
 	int tunnel = hci_open_dev(dev_id);
+	
 	if (tunnel < 0)
 	{
 		fprintf(stderr, "\nsearch_device: Issue at: hci_open_dev");
+
 		goto clean;
 	}
 	fprintf(stdout, "\nsearch_device: Searching for %s", target);
-	inquiry_info *ret = NULL; 
-	int count_ret = hci_inquiry(dev_id, search_time, max_ret, NULL, &ret, flags);
+
+	int count_ret = hci_inquiry(dev_id, search_time, max_ret, NULL, &inquiry_ret, flags);
+
 	if (count_ret < 0)
 	{
 		fprintf(stderr, "\nsearch_device: Issue searching");
+
 		goto clean;
 	}
 	else
@@ -157,169 +166,49 @@ int hcisearch_device (DBusConnection *conn, DBusError *err, char *target, char *
 	for (int i = 0; i < count_ret; i++)
 	{
 		ba2str(&(ret[i].bdaddr), dev_addr); 
+
 		memset(name, 0, sizeof(name)); 
+
 		read_ret = hci_read_remote_name(tunnel, &(ret[i].bdaddr), sizeof(name), name, 0);
+
 		if (read_ret < 0)
 		{
 			printf("\nsearch_device: No device name retreived at read_ret");
+
 			goto clean;
 		}
 
 		if (strcmp(name, target) == 0) 
 		{
 			fprintf(stdout, "\nsearch_device: Target Matched: Name: %s with MAC dev_address: %s", name, dev_addr);
+
 			strncpy(device_mac, dev_addr, mac_len- 1);
+
 			goto clean;
 		}
 		fprintf(stdout, "\nsearch_device: Other Devices found: {Name: %s},{MAC: %s}", name, dev_addr);
 	}
-
 clean:
 	if (ret != NULL)
 	{
 		free(ret);
+
 		fprintf(stdout, "\nsearch_device: Free results");
 	}
 	if (tunnel >= 0)
 	{
 		close(tunnel);
+
 		fprintf(stdout, "\nsearch_device: Free tunnel");
 	}
 	if (read_ret < 0)
-	{
 		return -1;
-	}
+
 	if (read_ret > 0)
-	{
 		return 0;
-	}
+
 	fprintf(stdout, "\nsearch_device: clean sucess");
 }
-char* dbusdiscover_device(DBusConnection *conn, DBusError *err, const char* target, size_t size)
-{
-	fprintf(stdout, "\ndbusdiscover_device: Searching for %s", target);
-
-	DBusMessage *msg = NULL;
-	DBusMessageIter crawl_path, dict_1, string_val, array_iter, dict_2, variant;
-	const char *object_path = NULL;
-	const char *iface = NULL;
-	const char *key_str = NULL;
-	const char *val_str = NULL;
-	char *object_path_result = NULL;
-
-	dbus_bus_add_match(conn,
-			"type='signal',interface='org.freedesktop.DBus.ObjectManager',member='InterfacesAdded'",
-			err);
-	dbus_connection_flush(conn);
-
-	dbus_call(conn, err, BLE_ADAPTER, ADAPTER_1, "StartDiscovery");
-
-	while (dbus_connection_read_write(conn, -1))
-	{
-		msg = dbus_connection_pop_message(conn);
-		dbus_connection_dispatch(conn);
-		if (!msg)
-		{
-			fprintf(stdout, "\nWaiting for connection");
-			continue;
-		}
-
-		if (dbus_message_get_type(msg) != DBUS_MESSAGE_TYPE_SIGNAL)
-		{
-			dbus_message_unref(msg);
-			continue;
-		}
-
-		if (!dbus_message_iter_init(msg, &crawl_path))
-		{
-			dbus_message_unref(msg);
-			continue;
-		}
-
-		if (dbus_message_iter_get_arg_type(&crawl_path) != DBUS_TYPE_OBJECT_PATH)
-		{
-			dbus_message_unref(msg);
-			continue;
-		}
-
-		dbus_message_iter_get_basic(&crawl_path, &object_path);
-		fprintf(stdout, "\ndbusdiscover_device: Object Path %s", object_path);
-
-		dbus_message_iter_next(&crawl_path);
-		if (dbus_message_iter_get_arg_type(&crawl_path) != DBUS_TYPE_ARRAY)
-		{
-			dbus_message_unref(msg);
-			continue;
-		}
-
-		dbus_message_iter_recurse(&crawl_path, &dict_1);
-		while (dbus_message_iter_get_arg_type(&dict_1) == DBUS_TYPE_DICT_ENTRY)
-		{
-			dbus_message_iter_recurse(&dict_1, &string_val);
-			if (dbus_message_iter_get_arg_type(&string_val) != DBUS_TYPE_STRING)
-			{
-				dbus_message_iter_next(&dict_1);
-				continue;
-			}
-
-			dbus_message_iter_get_basic(&string_val, &iface);
-			if (strncmp(iface, DEVICE_1, sizeof(DEVICE_1)-1) == 0)
-			{
-				dbus_message_iter_next(&string_val);
-				if (dbus_message_iter_get_arg_type(&string_val) != DBUS_TYPE_ARRAY)
-				{
-					dbus_message_iter_next(&dict_1);
-					continue;
-				}
-
-				dbus_message_iter_recurse(&string_val, &array_iter);
-				while (dbus_message_iter_get_arg_type(&array_iter) == DBUS_TYPE_DICT_ENTRY)
-				{
-					dbus_message_iter_recurse(&array_iter, &dict_2);
-					if (dbus_message_iter_get_arg_type(&dict_2) != DBUS_TYPE_STRING)
-					{
-						dbus_message_iter_next(&array_iter);
-						continue;
-					}
-
-					dbus_message_iter_get_basic(&dict_2, &key_str);
-					dbus_message_iter_next(&dict_2);
-					if (dbus_message_iter_get_arg_type(&dict_2) != DBUS_TYPE_VARIANT)
-					{
-						dbus_message_iter_next(&array_iter);
-						continue;
-					}
-
-					dbus_message_iter_recurse(&dict_2, &variant);
-					if (dbus_message_iter_get_arg_type(&variant) != DBUS_TYPE_STRING)
-					{
-						dbus_message_iter_next(&array_iter);
-						continue;
-					}
-
-					dbus_message_iter_get_basic(&variant, &val_str);
-					printf("\ndbusdiscover_device: %s : %s", key_str, val_str);
-
-					if (strncmp(key_str, "Name", 4) == 0)
-					{
-						if (strncmp(val_str, target, size - 1) == 0)
-						{
-							object_path_result = strdup(object_path);
-							dbus_message_unref(msg);
-							dbus_call(conn, err, BLE_ADAPTER, ADAPTER_1, "StopDiscovery");
-							return object_path_result;
-						}
-					}
-					dbus_message_iter_next(&array_iter);
-				}
-			}
-			dbus_message_iter_next(&dict_1);
-		}
-		dbus_message_unref(msg);
-	}
-	return NULL;
-}
-
 
 void format_path(char *in)
 {
@@ -333,14 +222,163 @@ void format_path(char *in)
 	}
 }
 
+char* dbusdiscover_device(DBusConnection *conn, DBusError *err, const char* target, size_t size)
+{
+	fprintf(stdout, "\ndbusdiscover_device: Searching for %s", target);
+
+	DBusMessage *msg = NULL;
+
+	DBusMessageIter crawl_path, dict_1, string_val, array_iter, dict_2, variant;
+
+	char *object_path = NULL, *iface = NULL, *key_str = NULL, *val_str = NULL, *object_path_result = NULL;
+
+	dbus_bus_add_match(conn, INTERFACES_ADDED, err);
+
+	dbus_connection_flush(conn);
+
+	dbus_call(conn, err, BLE_ADAPTER, ADAPTER_1, "StartDiscovery");
+
+	while (dbus_connection_read_write(conn, -1))
+	{
+		msg = dbus_connection_pop_message(conn);
+
+		dbus_connection_dispatch(conn);
+
+		if (!msg)
+		{
+			fprintf(stdout, "\nWaiting for connection");
+
+			continue;
+		}
+
+		if (dbus_message_get_type(msg) != DBUS_MESSAGE_TYPE_SIGNAL)
+		{
+			dbus_message_unref(msg);
+
+			continue;
+		}
+
+		if (!dbus_message_iter_init(msg, &crawl_path))
+		{
+			dbus_message_unref(msg);
+
+			continue;
+		}
+
+		if (dbus_message_iter_get_arg_type(&crawl_path) != DBUS_TYPE_OBJECT_PATH)
+		{
+			dbus_message_unref(msg);
+
+			continue;
+		}
+
+		dbus_message_iter_get_basic(&crawl_path, &object_path);
+
+		fprintf(stdout, "\ndbusdiscover_device: Object Path %s", object_path);
+
+		dbus_message_iter_next(&crawl_path);
+
+		if (dbus_message_iter_get_arg_type(&crawl_path) != DBUS_TYPE_ARRAY)
+		{
+			dbus_message_unref(msg);
+
+			continue;
+		}
+
+		dbus_message_iter_recurse(&crawl_path, &dict_1);
+
+		while (dbus_message_iter_get_arg_type(&dict_1) == DBUS_TYPE_DICT_ENTRY)
+		{
+			dbus_message_iter_recurse(&dict_1, &string_val);
+
+			if (dbus_message_iter_get_arg_type(&string_val) != DBUS_TYPE_STRING)
+			{
+				dbus_message_iter_next(&dict_1);
+
+				continue;
+			}
+
+			dbus_message_iter_get_basic(&string_val, &iface);
+
+			if (strncmp(iface, DEVICE_1, sizeof(DEVICE_1)-1) == 0)
+			{
+				dbus_message_iter_next(&string_val);
+
+				if (dbus_message_iter_get_arg_type(&string_val) != DBUS_TYPE_ARRAY)
+				{
+					dbus_message_iter_next(&dict_1);
+
+					continue;
+				}
+
+				dbus_message_iter_recurse(&string_val, &array_iter);
+
+				while (dbus_message_iter_get_arg_type(&array_iter) == DBUS_TYPE_DICT_ENTRY)
+				{
+					dbus_message_iter_recurse(&array_iter, &dict_2);
+
+					if (dbus_message_iter_get_arg_type(&dict_2) != DBUS_TYPE_STRING)
+					{
+						dbus_message_iter_next(&array_iter);
+
+						continue;
+					}
+
+					dbus_message_iter_get_basic(&dict_2, &key_str);
+
+					dbus_message_iter_next(&dict_2);
+
+					if (dbus_message_iter_get_arg_type(&dict_2) != DBUS_TYPE_VARIANT)
+					{
+						dbus_message_iter_next(&array_iter);
+
+						continue;
+					}
+
+					dbus_message_iter_recurse(&dict_2, &variant);
+
+					if (dbus_message_iter_get_arg_type(&variant) != DBUS_TYPE_STRING)
+					{
+						dbus_message_iter_next(&array_iter);
+
+						continue;
+					}
+
+					dbus_message_iter_get_basic(&variant, &val_str);
+
+					printf("\ndbusdiscover_device: %s : %s", key_str, val_str);
+
+					if (strncmp(key_str, "Name", 4) == 0)
+					{
+						if (strncmp(val_str, target, size - 1) == 0)
+						{
+							object_path_result = strdup(object_path);
+
+							dbus_message_unref(msg);
+
+							dbus_call(conn, err, BLE_ADAPTER, ADAPTER_1, "StopDiscovery");
+
+							return object_path_result;
+						}
+					}
+					dbus_message_iter_next(&array_iter);
+				}
+			}
+			dbus_message_iter_next(&dict_1);
+		}
+		dbus_message_unref(msg);
+	}
+	return NULL;
+}
+
 char *read_device(char *target, char* path)
 {
-	char file_contents[BUFF_SIZE];
-	char event_num [8] = { 0 };
-	int device_flag = 0;
-	char *event_str = NULL;
-	int device_file = -1;
+	char file_contents[BUFF_SIZE], event_num [8] = { 0 }, *event_str = NULL;
+
+	int device_flag = 0, device_file = -1;
+
 	int count = 0;
+
 	while(count < 3)
 	{
 		device_file = open(path, O_RDONLY);

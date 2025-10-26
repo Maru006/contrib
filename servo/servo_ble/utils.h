@@ -1,9 +1,12 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+/* Bluez definitions */
 #define BLE_ADAPTER "/org/bluez/hci0"
 #define DEVICE_1 "org.bluez.Device1"
 #define ADAPTER_1 "org.bluez.Adapter1"
+#define INTERFACES_ADDED "type='signal',interface='org.freedesktop.DBus.ObjectManager',member='InterfacesAdded'"
+
 #define DEVICES "/proc/bus/input/devices"
 #define DEVICE_INPUT_PATH "/dev/input/"
 
@@ -15,17 +18,17 @@
 #define PWM 35
 #define PCA9685_OSC_CLOCK 25000000
 
-/* PCA9685 DATASHEET REGISTERS*/
+/* PCA9685 DATASHEET REGISTERS */
 #define MODE1 0x00
 #define PCA 0x40
-#define HEAD 0x0A //PCA LED0_ON_H
-#define TAIL 0x06 //PCA LED1_ON_L
+#define HEAD 0x0A /* LED0_ON_H */
+#define TAIL 0x06 /* LED1_ON_L */
 #define PRESCALE 0xFE
 
-/* TCA9548A DATASHEET REGISTERS*/
+/* TCA9548A DATASHEET REGISTERS */
 #define MUX 0x70
 
-/* Master definitions for communication*/
+/* Master definitions for communication */
 #define I2C_DEV_PATH "/dev/i2c-1"
 
 /* Servo Limitations */
@@ -61,7 +64,7 @@
 
 extern char *device_path;
 
-/* 		----------Events----------
+/* 		----------evdev Events references----------
  * Event type 0 (EV_SYN)
   Event type 1 (EV_KEY)
     Event code 304 (BTN_SOUTH) 	A

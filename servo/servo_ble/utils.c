@@ -15,18 +15,23 @@
 #include "utils.h"
 
 
-int dbus_call(DBusConnection *conn, DBusError *err, const char *target, const char *interface, const char *method)
+int dbus_call(DBusConnection *conn, DBusError *err, char *target, char *interface, char *method)
 {
 	int ret= -1;
+	
+	char *err_key = NULL;
+	
+	char *err_value = NULL;
+
 	DBusMessage *msg = NULL;
+	
 	DBusPendingCall *pending = NULL;
+	
 	DBusMessage *reply = NULL;
 
-	const char *err_key = NULL;
-	const char *err_value = NULL;
-
 	msg = dbus_message_new_method_call("org.bluez", target, interface, method);
-	if (!msg) 
+	
+	if (!msg)
 	{
 		fprintf(stderr, "\ndbus_call: Failed to create message");
 		goto clean;
@@ -34,26 +39,38 @@ int dbus_call(DBusConnection *conn, DBusError *err, const char *target, const ch
 	
 	if (strcmp(method, "RemoveDevice") == 0)
 	{
-		DBusMessageIter header;
-		dbus_message_iter_init_append(msg, &header);
+		if (!device_path)
+		{
+			fprintf(stderr,"\ndbus_call: unknown device_path. Requires dbusdiscover_device");
+			goto clean;
+		}
 
+		DBusMessageIter header;
+
+		dbus_message_iter_init_append(msg, &header);
+		
+		//requires device mac address via extern device_path
 		if (!dbus_message_iter_append_basic(&header, DBUS_TYPE_OBJECT_PATH, &device_path))
 		{
 			fprintf(stderr, "\ndbus_call: Failed to append header");
 			goto clean;
 		}
 	}
-
+	
+	//blocking
 	if (!dbus_connection_send_with_reply(conn, msg, &pending, -1)) 
 	{
 		fprintf(stderr, "\ndbus_call: Failed to send with reply");
 		goto clean;
 	}
-	dbus_message_unref(msg);
+
+	dbus_message_unref(msg); 
 	msg = NULL;
 
 	dbus_pending_call_block(pending); 
+	
 	reply = dbus_pending_call_steal_reply(pending);
+
 	if (!reply) 
 	{
 		fprintf(stderr, "\ndbus_call: Failed %s; No reply from D-Bus\n", method);
@@ -478,7 +495,7 @@ int setangle(int fd, int *runtime, uint8_t channel, int data, uint8_t prescale)
 
 		//printf("\nWaking Up Device Mode1 as 0x00");
 		command2pca(fd, MODE1, 0x00);
-		
+
 		(*runtime)++;
 	}
 	else 
@@ -510,7 +527,7 @@ int setmove(int *reference, int *target, int fd, int *runtime, uint8_t channel, 
 		.tv_sec = 0,
 		.tv_nsec = 15000000L
 	};
-	
+
 	while (*reference != *target)
 	{
 		if (*reference < *target)
@@ -543,14 +560,14 @@ char *read_event(char *path)
 		fprintf(stderr, "\nread_event: Failed to open event file");
 		goto clean;
 	}
-	
+
 	int i2c_file = open(I2C_DEV_PATH, O_RDWR);
 	if (i2c_file < 0)
 	{
 		fprintf(stderr, "\nread_event: Failed to open I2C path");
 		goto clean;
 	}
-	
+
 	setangle(i2c_file, &runtime, HEAD, headbase, PWM);
 	setangle(i2c_file, &runtime, TAIL, tailbase, PWM);
 
@@ -577,7 +594,7 @@ char *read_event(char *path)
 					tail_target = tailbase - SENSITIVITY;
 				else if (ev.code == JS_HORIZONTAL && ev.value == JS_RIGHT)
 					tail_target = tailbase + SENSITIVITY;
-				
+
 				setmove(&headbase, &head_target, i2c_file, &runtime, HEAD, PWM);
 				setmove(&tailbase, &tail_target, i2c_file, &runtime, TAIL, PWM);
 				fprintf(stdout, "\nread_event: %d, Head: %d, Tail: %d", runtime, headbase, tailbase);

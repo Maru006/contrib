@@ -152,7 +152,7 @@ extern char *device_path;
 //BLE
 int hcisearch_device (DBusConnection *conn, DBusError *err, char *target, char *device_mac, size_t mac_len);
 
-int dbus_call(DBusConnection *conn, DBusError *err, const char *target, const char *interface, const char *method);
+int dbus_call(DBusConnection *conn, DBusError *err, char *target, char *interface, char *method);
 
 char *dbusdiscover_device(DBusConnection* conn, DBusError *err, const char* target, size_t size);
 

@@ -161,7 +161,7 @@ char *dbusdiscover_device(DBusConnection* conn, DBusError *err, const char* targ
 
 void format_path(char *in);
 
-char *read_device(char *target, char* path);
+char *read_device(char *target, char* path, int *count);
 
 char *read_event(char* path);
 

@@ -16,18 +16,7 @@ char *device_path = NULL;
 
 int main(int argc, char *argv[])
 {
-	if (argc > 1 && strcmp(argv[1], "--stderr-only") == 0)
-	{
-		freopen("/dev/null", "w", stdout);
-		setvbuf(stderr, NULL, _IONBF, 0);
-	}
-	else
-	{
-		setvbuf(stdout, NULL, _IONBF, 0);
-		setvbuf(stderr, NULL, _IONBF, 0);
-	}
-
-	size_t size = sizeof(device_name)/sizeof(device_name[0]);
+	size_t size = sizeof(device_path)/sizeof(device_path[0]);
 
 	int count = 3;
 
@@ -56,7 +45,7 @@ int main(int argc, char *argv[])
 	if(dbus_call(conn, &err, device_path, DEVICE_1, "Connect") < 0)
 		goto clean;
 	
-	mask_path = read_device(device_name, DEVICES, &count);
+	mask_path = read_device(device_path, DEVICES, &count);
 
 	if (!mask_path)
 	{
@@ -67,7 +56,6 @@ int main(int argc, char *argv[])
 	fprintf(stdout, "\nmain: mask_path: %s",mask_path);
 	
 	printf("\nBegin inputs");
-	
 	
 	event_buff = read_event(mask_path);
 

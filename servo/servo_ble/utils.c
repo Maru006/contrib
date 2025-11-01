@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -379,17 +378,15 @@ char *read_device(char *target, char* path, int *count)
 
 	ssize_t read_contents = 0;
 
-	while(*count < 3)
+	while((*count) < 3)
 	{
 		device_file = open(path, O_RDONLY);
-
 		if (device_file < 0)
 		{
 			fprintf(stderr, "\nread_device: Failed to read device path");
 
-			goto clean;
+			break;
 		}
-
 		while ((read_contents = read(device_file, file_contents, BUFF_SIZE - 1)) > 0) 
 		{
 			file_contents[read_contents] = '\0';
@@ -418,9 +415,11 @@ char *read_device(char *target, char* path, int *count)
 				line = strtok(NULL, "\n");
 			}
 		}
-		close(device_file);
+		++(count);
+		
+		sleep(1);
 
-		fprintf(stdout, "read:device: Attempts: %d", &count);
+		fprintf(stdout, "\nread_device: Attempts: %d", &count);
 	}
 	if (event_num[0] == 0)
 	{

@@ -19,7 +19,7 @@ int dbus_call(DBusConnection *conn, DBusError *err, char *target, char *interfac
 {
 	int ret= -1;
 	
-	char *err_key = NULL, *err_value = NULL;
+	const char *err_key = NULL, *err_value = NULL;
 
 	DBusMessage *msg = NULL, *reply = NULL;
 	
@@ -91,7 +91,7 @@ int dbus_call(DBusConnection *conn, DBusError *err, char *target, char *interfac
 		}
 		goto clean;
 	}
-	fprintf(stdout, "\ndbus_call: %s on %c sucess", method, target);
+	fprintf(stdout, "\ndbus_call: %s on %s sucess", method, target);
 
 	ret = 0;
 
@@ -165,11 +165,11 @@ int hcisearch_device (DBusConnection *conn, DBusError *err, char *target, char *
 
 	for (int i = 0; i < count_ret; i++)
 	{
-		ba2str(&(ret[i].bdaddr), dev_addr); 
+		ba2str(&(inquiry_ret[i].bdaddr), dev_addr); 
 
 		memset(name, 0, sizeof(name)); 
 
-		read_ret = hci_read_remote_name(tunnel, &(ret[i].bdaddr), sizeof(name), name, 0);
+		read_ret = hci_read_remote_name(tunnel, &(inquiry_ret[i].bdaddr), sizeof(name), name, 0);
 
 		if (read_ret < 0)
 		{
@@ -189,9 +189,9 @@ int hcisearch_device (DBusConnection *conn, DBusError *err, char *target, char *
 		fprintf(stdout, "\nsearch_device: Other Devices found: {Name: %s},{MAC: %s}", name, dev_addr);
 	}
 clean:
-	if (ret != NULL)
+	if (inquiry_ret != NULL)
 	{
-		free(ret);
+		free(inquiry_ret);
 
 		fprintf(stdout, "\nsearch_device: Free results");
 	}
@@ -258,7 +258,7 @@ char* dbusdiscover_device(DBusConnection *conn, DBusError *err, const char* targ
 			continue;
 		}
 
-		if (!dbus_message_iter_init(msg, &crawl_path))
+		if (!dbus_message_iter_init(msg, &crawl_path)) /* no payload? skip : points to first argument */
 		{
 			dbus_message_unref(msg);
 
@@ -274,7 +274,7 @@ char* dbusdiscover_device(DBusConnection *conn, DBusError *err, const char* targ
 
 		dbus_message_iter_get_basic(&crawl_path, &object_path);
 
-		fprintf(stdout, "\ndbusdiscover_device: Object Path %s", object_path);
+		fprintf(stdout, "\ndbusdiscover_device: Device type path: %s", object_path);
 
 		dbus_message_iter_next(&crawl_path);
 
@@ -371,32 +371,33 @@ char* dbusdiscover_device(DBusConnection *conn, DBusError *err, const char* targ
 	return NULL;
 }
 
-char *read_device(char *target, char* path)
+char *read_device(char *target, char* path, int *count)
 {
 	char file_contents[BUFF_SIZE], event_num [8] = { 0 }, *event_str = NULL;
 
-	int device_flag = 0, device_file = -1;
+	int device_flag = 0, device_file = -1, read_flag = 0;
 
-	int count = 0;
+	ssize_t read_contents = 0;
 
-	while(count < 3)
+	while(*count < 3)
 	{
 		device_file = open(path, O_RDONLY);
+
 		if (device_file < 0)
 		{
 			fprintf(stderr, "\nread_device: Failed to read device path");
+
 			goto clean;
 		}
 
-		ssize_t read_contents;
 		while ((read_contents = read(device_file, file_contents, BUFF_SIZE - 1)) > 0) 
 		{
 			file_contents[read_contents] = '\0';
 
 			char *line = strtok(file_contents, "\n");
+
 			while (line != NULL)
 			{
-				printf("\n%s", line);
 				if (strstr(line, "Name=") && strstr(line, target))
 				{
 					device_flag = 1;
@@ -404,10 +405,13 @@ char *read_device(char *target, char* path)
 				else if (device_flag && strstr(line, "Handlers")) 
 				{
 					char *event = strstr(line, "event");
+
 					if (event)
 					{
 						sscanf(event, "event%7s", event_num);
+
 						device_flag = 0;
+
 						break;
 					}
 				}
@@ -415,19 +419,22 @@ char *read_device(char *target, char* path)
 			}
 		}
 		close(device_file);
-		fprintf(stdout, "\nread_device: Reattempt %d", ++count);
-		sleep(2);
+
+		fprintf(stdout, "read:device: Attempts: %d", &count);
 	}
 	if (event_num[0] == 0)
 	{
 		fprintf(stderr, "\nread_device: Device descriptor not found");
+
 		goto clean;
 	}
 
-	event_str = malloc(PATH_BUFFER);
+	event_str = malloc(PATH_BUFFER); // requires transfer to main to free.
+
 	if(!event_str)
 	{
 		fprintf(stderr, "\nread_device: Failed to allocate buffer"); 
+
 		goto clean;
 	}
 	snprintf(event_str, PATH_BUFFER, "%sevent%s", DEVICE_INPUT_PATH, event_num);
@@ -437,11 +444,8 @@ clean:
 	{
 		close(device_file);
 	}
-
 	return event_str;
 }
-
-// WASD
 
 int command2tca(int fd, uint8_t channel)
 {
@@ -490,48 +494,54 @@ int command2pca(int fd, uint8_t reg, uint8_t data)
 			return -1;
 		}
 	}
-	return 0; // does not affect while(1). Only main()
+	return 0; 
 }
 
 int setangle(int fd, int *runtime, uint8_t channel, int data, uint8_t prescale)
 {
 	struct timespec pause;	
 
-	// runetime != NULL checks if the pointer exists
 	if (runtime != NULL && (*runtime) == 0)
 	{
 		printf("\nFirst runtime commands");
+
 		printf("\nPutting Device to sleep: Mode1 to 0x10");
+
 		int set_mode0 = command2pca(fd, MODE1, 0x10);
+
 		if(set_mode0 < 0)
 		{
 			perror("\nsetangle: Issue Setting MODE 1 as: ");
+
 			return -1;
 		}
 		int auto_increment = command2pca(fd, MODE1, 0xA1);
+
 		if (auto_increment < 0)
 		{
 			perror("\nsetangle: Issue Setting AUTOINCREMENT");
 		}
 		int set_prescale = command2pca(fd, PRESCALE, prescale);
+
 		if(set_prescale < 0)
 		{
 			perror("\nsetangle: Issue Setting PRESCALE as: ");
 			return -1;	
 		}
 		command2pca(fd, channel, 0x00);
+
 		command2pca(fd, channel +1, 0x00);
-		//printf("\nOn at channels: %d, %d", channel, channel+1);
 
 		command2pca(fd,channel +2, data & 0xFF); //0xFF is 1111 1111
+
 		command2pca(fd, channel +3, (data >> 8) & 0xFF);
-		//printf("\nOff at channels: %d, %d", channel+2, channel+3);
 
 		pause.tv_sec = 0;
+
 		pause.tv_nsec = 5000000;
+
 		nanosleep(&pause, NULL);
 
-		//printf("\nWaking Up Device Mode1 as 0x00");
 		command2pca(fd, MODE1, 0x00);
 
 		(*runtime)++;
@@ -539,18 +549,19 @@ int setangle(int fd, int *runtime, uint8_t channel, int data, uint8_t prescale)
 	else 
 	{
 		command2pca(fd, channel, 0x00);
+
 		command2pca(fd, channel +1, 0x00);
-		//printf("\nOn at channels: %d, %d", channel, channel+1);
 
 		command2pca(fd,channel +2, data & 0xFF); //0xFF is 1111 1111
+		
 		command2pca(fd, channel +3, (data >> 8) & 0xFF);
-		// printf("\nOff at channels: %d, %d", channel+2, channel+3);
 
 		pause.tv_sec = 0;
+
 		pause.tv_nsec = 5000000;
+
 		nanosleep(&pause, NULL);
 
-		//printf("\nWaking Up Device: Mode1 as 0x00");
 		command2pca(fd, MODE1, 0x00);
 
 		(*runtime)++;
@@ -563,6 +574,7 @@ int setmove(int *reference, int *target, int fd, int *runtime, uint8_t channel, 
 	struct timespec pause = 
 	{
 		.tv_sec = 0,
+
 		.tv_nsec = 15000000L
 	};
 
@@ -577,7 +589,9 @@ int setmove(int *reference, int *target, int fd, int *runtime, uint8_t channel, 
 			*reference -= SMOOTHNESS;
 		}
 		nanosleep(&pause, NULL);
+
 		setangle(fd, runtime, channel, *reference, prescale);
+
 		printf("\nTarget: %d Reference: %d", *target, *reference);
 	}
 	return 0;
@@ -586,55 +600,73 @@ int setmove(int *reference, int *target, int fd, int *runtime, uint8_t channel, 
 char *read_event(char *path)
 {
 	struct input_event ev;
+
 	int move, head_target, headbase, tail_target, tailbase, runtime = 0;
+
 	headbase = HEADDEFAULT;
+
 	head_target = HEADDEFAULT;
+
 	tailbase = TAILDEFAULT;
+
 	tail_target = TAILDEFAULT;
 
 	int event_file = open(path, O_RDONLY);
+
 	if (event_file < 0)
 	{
 		fprintf(stderr, "\nread_event: Failed to open event file");
+
 		goto clean;
 	}
-
 	int i2c_file = open(I2C_DEV_PATH, O_RDWR);
+
 	if (i2c_file < 0)
 	{
 		fprintf(stderr, "\nread_event: Failed to open I2C path");
+
 		goto clean;
 	}
 
 	setangle(i2c_file, &runtime, HEAD, headbase, PWM);
+
 	setangle(i2c_file, &runtime, TAIL, tailbase, PWM);
 
 	while (1)
 	{
 		ssize_t n = read(event_file, &ev, sizeof(ev));
+
 		if (n == sizeof(ev))
 		{
 			if (ev.type == EV_KEY) 
 			{
 				fprintf(stdout, "\nButton code=%u value=%d\n", ev.code, ev.value);
+
 				if (ev.code == JS_EXIT)
+
 					break;
 
 			} 
 			else if (ev.type == EV_ABS) 
 			{
 				fprintf(stdout, "\nAxis code=%u value=%d\n", ev.code, ev.value);
+
 				if (ev.code == JS_VERTICAL && ev.value == JS_UP)
 					head_target = headbase - SENSITIVITY;
+			
 				else if (ev.code == JS_VERTICAL && ev.value == JS_DOWN)
 					head_target = headbase + SENSITIVITY;
+			
 				else if (ev.code == JS_HORIZONTAL && ev.value == JS_LEFT)
 					tail_target = tailbase - SENSITIVITY;
+			
 				else if (ev.code == JS_HORIZONTAL && ev.value == JS_RIGHT)
 					tail_target = tailbase + SENSITIVITY;
 
 				setmove(&headbase, &head_target, i2c_file, &runtime, HEAD, PWM);
+
 				setmove(&tailbase, &tail_target, i2c_file, &runtime, TAIL, PWM);
+
 				fprintf(stdout, "\nread_event: %d, Head: %d, Tail: %d", runtime, headbase, tailbase);
 			} 
 			else if (ev.type == EV_SYN) 
@@ -646,10 +678,11 @@ char *read_event(char *path)
 		else
 		{
 			fprintf(stderr, "\nread_event: Error with read");
+
 			fflush(stderr);
+
 			break;
 		}
-
 	}
 clean:
 	if (event_file >= 0)

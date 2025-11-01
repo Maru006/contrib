@@ -370,17 +370,20 @@ char* dbusdiscover_device(DBusConnection *conn, DBusError *err, const char* targ
 	return NULL;
 }
 
-char *read_device(char *target, char* path, int *count)
+char *read_device(char *target, char* path, int *max_count)
 {
 	char file_contents[BUFF_SIZE], event_num [8] = { 0 }, *event_str = NULL;
 
 	int device_flag = 0, device_file = -1, read_flag = 0;
 
 	ssize_t read_contents = 0;
+	
+	int count = 0;
 
-	while((*count) < 3)
+	while(count != (*max_count))
 	{
 		device_file = open(path, O_RDONLY);
+
 		if (device_file < 0)
 		{
 			fprintf(stderr, "\nread_device: Failed to read device path");
@@ -415,11 +418,11 @@ char *read_device(char *target, char* path, int *count)
 				line = strtok(NULL, "\n");
 			}
 		}
-		++(count);
+		count++;
 		
 		sleep(1);
 
-		fprintf(stdout, "\nread_device: Attempts: %d", &count);
+		fprintf(stdout, "\nread_device: Attempts: %d", count);
 	}
 	if (event_num[0] == 0)
 	{

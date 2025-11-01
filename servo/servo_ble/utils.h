@@ -14,6 +14,9 @@
 #define BUFF_SIZE 4096
 #define DEVICE_MAC_BUFFER 19
 
+/* read_events attempts */
+#define ATTEMPTS 5
+
 #define UPDATE_RATE 50
 #define PWM 35
 #define PCA9685_OSC_CLOCK 25000000
@@ -161,7 +164,7 @@ char *dbusdiscover_device(DBusConnection* conn, DBusError *err, const char* targ
 
 void format_path(char *in);
 
-char *read_device(char *target, char* path, int *count);
+char *read_device(char *target, char* path, int *max_count);
 
 char *read_event(char* path);
 

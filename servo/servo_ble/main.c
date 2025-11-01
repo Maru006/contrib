@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
 {
 	size_t size = sizeof(device_path)/sizeof(device_path[0]);
 
-	int count = 3;
+	int retry = ATTEMPTS;
 
 	char device_name[] = "8BitDo Pro 2", ble_path[PATH_BUFFER] = {0}, *mask_path = NULL, *event_buff = NULL;
 
@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 	if(dbus_call(conn, &err, device_path, DEVICE_1, "Connect") < 0)
 		goto clean;
 	
-	mask_path = read_device(device_path, DEVICES, &count);
+	mask_path = read_device(device_path, DEVICES, &retry);
 
 	if (!mask_path)
 	{

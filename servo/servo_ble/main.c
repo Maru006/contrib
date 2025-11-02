@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 	if(dbus_call(conn, &err, device_path, DEVICE_1, "Connect") < 0)
 		goto clean;
 	
-	mask_path = read_device(device_path, DEVICES, &retry);
+	mask_path = read_device(device_name, DEVICES, &retry);
 
 	if (!mask_path)
 	{

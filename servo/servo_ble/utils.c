@@ -418,11 +418,11 @@ char *read_device(char *target, char* path, int *max_count)
 				line = strtok(NULL, "\n");
 			}
 		}
-		count++;
-		
+		close(device_file);
+
 		sleep(1);
 
-		fprintf(stdout, "\nread_device: Attempts: %d", count);
+		fprintf(stdout, "\nread_device: Attempts: %d", ++count);
 	}
 	if (event_num[0] == 0)
 	{
